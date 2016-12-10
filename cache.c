@@ -456,6 +456,7 @@ cache_char2policy(char c)		/* replacement policy as a char */
   case 'l': return LRU;
   case 'r': return Random;
   case 'f': return FIFO;
+  case 'o': return Custom;
   default: fatal("bogus replacement policy, `%c'", c);
   }
 }
@@ -474,6 +475,7 @@ cache_config(struct cache_t *cp,	/* cache instance */
 	  cp->policy == LRU ? "LRU"
 	  : cp->policy == Random ? "Random"
 	  : cp->policy == FIFO ? "FIFO"
+          : cp->policy == Custom ? "Custom"
 	  : (abort(), ""));
 }
 
@@ -625,6 +627,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* select the appropriate block to replace, and re-link this entry to
      the appropriate place in the way list */
   switch (cp->policy) {
+  case Custom:
   case LRU:
   case FIFO:
     repl = cp->sets[set].way_tail;
