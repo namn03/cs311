@@ -185,6 +185,7 @@ struct cache_set_t
   struct cache_tag_t *S_head;
   struct cache_tag_t *S_tail;
   struct cache_tag_t *Q_head;
+  int num_lir;
 
   struct cache_blk_t *blks;	/* cache blocks, allocated sequentially, so
 				   this pointer can also be used for random
@@ -346,9 +347,12 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 		 md_addr_t addr,	/* address of block to flush */
 		 tick_t now);		/* time of cache flush */
 
-struct cache_tag_t
+struct cache_tag_t *
 search_in_S(struct cache_tag_t *S_head, md_addr_t tag);
 
 void
 prune(struct cache_set_t *set);
+
+void
+print_S(struct cache_tag_t *head);
 #endif /* CACHE_H */

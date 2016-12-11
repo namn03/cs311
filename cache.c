@@ -402,9 +402,10 @@ cache_create(char *name,		/* name of the cache */
     {
       cp->sets[i].way_head = NULL;
       cp->sets[i].way_tail = NULL;
-
-      cp->sets[i].p_head = NULL;
-      cp->sets[i].p_tail = NULL;
+      cp->sets[i].S_head = NULL;
+      cp->sets[i].S_tail = NULL;
+      cp->sets[i].Q_head = NULL;
+      cp->sets[i].num_lir = 0;
 
       /* get a hash table, if needed */
       if (cp->hsize)
@@ -449,9 +450,6 @@ cache_create(char *name,		/* name of the cache */
 	    cp->sets[i].way_tail = blk;
 	}
 
-	cp->sets[i].P_head = NULL;
-	cp->sets[i].P_tail = NULL;
-	cp->sets[i].Q_head = NULL;
     }
   return cp;
 }
@@ -637,13 +635,53 @@ cache_access(struct cache_t *cp,	/* cache to access */
 //llllll
   case Custom:
     // miss
+    if(cp->sets[set].num_lir < 3) {
+      struct cache_tag_t *new = (struct cache_tag_t *) calloc(1, sizeof(struct cache_tag_t));
+      if(cp->sets[set].S_head) {
+        new->next = cp->sets[set].S_head;
+        cp->sets[set].S_head->prev = new;
+        new->prev = NULL;
+        cp->sets[set].S_head = new;
+      } else {
+        cp->sets[set].S_head = new;
+        new->prev = NULL; 
+        cp->sets[set].S_tail = new;
+        new->next = NULL;
+      }
+
+      blk = cp->sets[set].way_tail;
+      update_way_list(&cp->sets[set], blk, Head);
+      new->self = blk;
+      blk->self = new;
+      repl = blk;
+
+      new->type = 0;
+      cp->sets[set].num_lir++; 
+    } else if(cp->sets[set].num_lir == 4) {
+      struct cache_tag_t *new = (struct cache_tag_t *) calloc(1, sizeof(struct cache_tag_t));
+
+      assert(cp->sets[set].Q_head);
+
+      cp->sets[set].Q_head = new;
+      new->type = 1;
+
+      blk = cp->sets[set].way_tail;
+      update_way_list(&cp->sets[set], blk, Head);
+
+      new->self = blk;
+      blk->self = new;
+      repl = blk;
+
+      cp->sets[set].num_lir++;
+    } else {
     repl = cp->sets[set].Q_head->self;
 
     // Check tag in S
     struct cache_tag_t *S_head = cp->sets[set].S_head;
-    struct cache_tag_t *tag_node = search_in_S(cp->sets[set].S_head, blk->tag);
+    struct cache_tag_t *tag_node = search_in_S(cp->sets[set].S_head, tag);
     // case 1 : addr in S
     if(tag_node) {
+      puts("a");
       // move it to s_head + change type(LIR = 0)
       if(tag_node->prev) {
         tag_node->prev->next = tag_node->next;
@@ -657,50 +695,55 @@ cache_access(struct cache_t *cp,	/* cache to access */
       cp->sets[set].S_head = tag_node;
     
       tag_node->type = 0;
-
+      tag_node->self = cp->sets[set].Q_head->self;
+      tag_node->self->self = tag_node;
       // move S_tail(B) to Q_head + change type(HIR resident )
       //   1) if Q_head(E)'s next, prev are both null, free it
       //   2) else, change type
-      struct cache_tag_t Q_head = sets[set].Q_head;
+      struct cache_tag_t *Q_head = cp->sets[set].Q_head;
       if(Q_head->prev && Q_head->next) {
         free(Q_head);
       } else {
         Q_head->type = 2;
       }
 
-      sets[set].Q_head = sets[set].S_tail;
-      sets[set].Q_head->type = 1;
+      cp->sets[set].Q_head = cp->sets[set].S_tail;
+      cp->sets[set].Q_head->type = 1;
 
       // prune
       prune(&cp->sets[set]);
     } else {
+      puts("b");
       // case 2 : not in S
       // push top of S + type = HIR resident
       // change type of Q_head(E) to HIR non-resident
       // Q_head = new(C), type of new = HIR resident
       tag_node = (struct cache_tag_t *) calloc(1, sizeof(struct cache_tag_t));
       tag_node->type = 1;
-      tag_node->self = blk;
+      tag_node->self = cp->sets[set].Q_head->self;
+      tag_node->self->self = tag_node;
 
       S_head->prev = tag_node;
       tag_node->next = S_head;
       tag_node->prev = NULL;
-      sets[set].S_head = tag_node;
+      cp->sets[set].S_head = tag_node;
 
       // move S_tail(B) to Q_head + change type(HIR resident )
       //   1) if Q_head(E)'s next, prev are both null, free it
       //   2) else, change type
-      struct cache_tag_t *Q_head = sets[set].Q_head;
+      struct cache_tag_t *Q_head = cp->sets[set].Q_head;
       if(Q_head->prev && Q_head->next) {
         free(Q_head);
       } else {
         Q_head->type = 2;
       }
 
-      sets[set].Q_head = sets[set].S_tail;
-      sets[set].Q_head->type = 1;
+      cp->sets[set].Q_head = tag_node;
+      cp->sets[set].Q_head->type = 1;
     }
-
+    assert(cp->sets[set].Q_head);
+  }
+  break;
       
 
   case LRU:
@@ -717,7 +760,6 @@ cache_access(struct cache_t *cp,	/* cache to access */
   default:
     panic("bogus replacement policy");
   }
-
   /* remove this block from the hash bucket chain, if hash exists */
   if (cp->hsize)
     unlink_htab_ent(cp, &cp->sets[set], repl);
@@ -812,17 +854,26 @@ cache_access(struct cache_t *cp,	/* cache to access */
     // hit
     // move to S_head
     struct cache_tag_t *tag_node = blk->self;
-    
+    struct cache_tag_t *Q_head = cp->sets[set].Q_head;
+ 
     // HIRS and not in S
-    if(!Q_head->prev && !Q_head->next) {
+    if(!tag_node->prev && !tag_node->next) {
       // push
       cp->sets[set].S_head->prev = tag_node;
       tag_node->prev = NULL;
       tag_node->next = cp->sets[set].S_head;
       cp->sets[set].S_head = tag_node;
     } else {
+      // delete
+      if(tag_node->prev) {
+        tag_node->prev->next = tag_node->next;
+      }
+      if(tag_node->next) {
+        tag_node->next->prev = tag_node->prev;
+      }
+      // push top
       cp->sets[set].S_head->prev = tag_node;
-      tag_node->next = sets[set].S_head;
+      tag_node->next = cp->sets[set].S_head;
       tag_node->prev = NULL;
       cp->sets[set].S_head = tag_node;
       
@@ -833,8 +884,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
         case 1:
           tag_node->type = 0;
           
-          sets[set].Q_head = sets[set].S_tail;
-          sets[set].Q_head->type = 1;
+          cp->sets[set].Q_head = cp->sets[set].S_tail;
+          cp->sets[set].Q_head->type = 1;
           
           prune(&cp->sets[set]);
           break;
@@ -1056,7 +1107,7 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
   return lat;
 }
 
-struct cache_tag_t
+struct cache_tag_t *
 search_in_S(struct cache_tag_t *S_head, md_addr_t tag) {
     struct cache_tag_t *iter;
 
@@ -1077,8 +1128,7 @@ prune(struct cache_set_t *set) {
   struct cache_tag_t iter;
 
   while(set->S_tail->type > 0) {
-    set->S_tail->prev->next = set->S_tail;
-    set->S_tail= set->S_tail->prev;
+    set->S_tail->prev->next = NULL;
 
     if(set->S_tail->type == 2) {
       free(set->S_tail);
@@ -1086,5 +1136,17 @@ prune(struct cache_set_t *set) {
       set->S_tail->prev = NULL;
       set->S_tail->next = NULL;
     }
+
+    set->S_tail = set->S_tail->prev;
   }
+  assert(set->S_tail);
+}
+
+void
+print_S(struct cache_tag_t *head) {
+  struct cache_tag_t *iter;
+  for(iter = head; iter!=NULL; iter = iter->next) {
+    printf("type : %d\n", iter->type);
+  }
+  printf("---------------------\n");
 }
