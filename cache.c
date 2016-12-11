@@ -402,6 +402,10 @@ cache_create(char *name,		/* name of the cache */
     {
       cp->sets[i].way_head = NULL;
       cp->sets[i].way_tail = NULL;
+
+      cp->sets[i].p_head = NULL;
+      cp->sets[i].p_tail = NULL;
+
       /* get a hash table, if needed */
       if (cp->hsize)
 	{
@@ -444,6 +448,10 @@ cache_create(char *name,		/* name of the cache */
 	  if (!cp->sets[i].way_tail)
 	    cp->sets[i].way_tail = blk;
 	}
+
+	cp->sets[i].P_head = NULL;
+	cp->sets[i].P_tail = NULL;
+	cp->sets[i].Q_head = NULL;
     }
   return cp;
 }
@@ -628,6 +636,36 @@ cache_access(struct cache_t *cp,	/* cache to access */
      the appropriate place in the way list */
   switch (cp->policy) {
   case Custom:
+    struct cache_tag_t iter;
+    // miss
+    // Check tag in S
+    tag = find()
+    // case 1 : addr in S
+    // move it to s_head + change type(LIR = 0)
+    //   1) if Q_head(E)'s next, prev are both null, free it
+    //   2) else, change type
+    // move S_tail(B) to Q_head + change type(HIR resident )
+    // prune(next, prev NULL!)
+    if(tag) {
+    }
+
+    // case 2 : not in S
+    // push top of S + type = HIR resident
+    // change type of Q_head(E) to HIR non-resident
+    // Q_head = new(C), type of new = HIR resident
+
+    // if S_size is too big,
+    // remove cloest HIRS non-resident from tail
+
+    for(iter = cp->sets[set].S_head;
+        iter != NULL;
+	iter = iter->next) {
+	// f
+          if(iter->tag == blk->tag) {
+	    assert(iter->type == 1);
+            iter->
+	  }
+	}
   case LRU:
   case FIFO:
     repl = cp->sets[set].way_tail;
@@ -732,6 +770,20 @@ cache_access(struct cache_t *cp,	/* cache to access */
       /* move this block to head of the way (MRU) list */
       update_way_list(&cp->sets[set], blk, Head);
     }
+  else if(cp->policy == Custom) {
+    // hit
+    // move to S_head
+    // case 1: LIR
+    // prune
+    // case 2: HIR
+    // 1) in S
+    // change type to LIR
+    // Q->head = S->tail
+    // s->tail->type = HIR
+    // prune
+    // 2) not in S,
+    // push to S_head
+  }
 
   /* tag is unchanged, so hash links (if they exist) are still valid */
 

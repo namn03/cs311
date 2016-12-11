@@ -146,6 +146,7 @@ struct cache_blk_t
   struct cache_blk_t *way_next;	/* next block in the ordered way chain, used
 				   to order blocks for replacement */
   struct cache_blk_t *way_prev;	/* previous block in the order way chain */
+
   struct cache_blk_t *hash_next;/* next block in the hash bucket chain, only
 				   used in highly-associative caches */
   /* since hash table lists are typically small, there is no previous
@@ -163,6 +164,16 @@ struct cache_blk_t
 				   should probably be a multiple of 8 */
 };
 
+
+struct cache_tag_t
+{
+  md_addr_t tag;
+  struct cache_tag_t *next;
+  struct cache_tag_t *prev;
+  int type;
+  // 0:LIR 1:non-resident HIR 2:regident HIR
+}
+
 /* cache set definition (one or more blocks sharing the same set index) */
 struct cache_set_t
 {
@@ -170,6 +181,11 @@ struct cache_set_t
 				   for low-assoc caches */
   struct cache_blk_t *way_head;	/* head of way list */
   struct cache_blk_t *way_tail;	/* tail pf way list */
+
+  struct cache_tag_t *S_head;
+  struct cache_tag_t *S_tail;
+  struct cache_tag_t *Q_head;
+
   struct cache_blk_t *blks;	/* cache blocks, allocated sequentially, so
 				   this pointer can also be used for random
 				   access to cache blocks */
@@ -240,6 +256,7 @@ struct cache_t
   /* NOTE: this is a variable-size tail array, this must be the LAST field
      defined in this structure! */
   struct cache_set_t sets[1];	/* each entry is a set */
+  int lirs_size;
 };
 
 /* create and initialize a general cache structure */
