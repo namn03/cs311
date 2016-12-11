@@ -172,7 +172,7 @@ struct cache_tag_t
   struct cache_blk_t *self;
   int type;
   // 0:LIR 1:resident HIR 2:non-regident HIR
-}
+};
 
 /* cache set definition (one or more blocks sharing the same set index) */
 struct cache_set_t

@@ -640,8 +640,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
     repl = cp->sets[set].Q_head->self;
 
     // Check tag in S
-    struct cache_tag_t S_head = cp->sets[set].S_head;
-    struct cache_tag_t tag_node = search_in_S(cp->sets[set].S_head, blk->tag);
+    struct cache_tag_t *S_head = cp->sets[set].S_head;
+    struct cache_tag_t *tag_node = search_in_S(cp->sets[set].S_head, blk->tag);
     // case 1 : addr in S
     if(tag_node) {
       // move it to s_head + change type(LIR = 0)
@@ -678,7 +678,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
       // push top of S + type = HIR resident
       // change type of Q_head(E) to HIR non-resident
       // Q_head = new(C), type of new = HIR resident
-      tag_node = calloc(1, sizeof(struct cache_tag_t));
+      tag_node = (struct cache_tag_t *) calloc(1, sizeof(struct cache_tag_t));
       tag_node->type = 1;
       tag_node->self = blk;
 
@@ -690,7 +690,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
       // move S_tail(B) to Q_head + change type(HIR resident )
       //   1) if Q_head(E)'s next, prev are both null, free it
       //   2) else, change type
-      struct cache_tag_t Q_head = sets[set].Q_head;
+      struct cache_tag_t *Q_head = sets[set].Q_head;
       if(Q_head->prev && Q_head->next) {
         free(Q_head);
       } else {
@@ -811,7 +811,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   else if(cp->policy == Custom) {
     // hit
     // move to S_head
-    struct cache_tag_t tag_node = blk->self;
+    struct cache_tag_t *tag_node = blk->self;
     
     // HIRS and not in S
     if(!Q_head->prev && !Q_head->next) {
@@ -1058,7 +1058,7 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 
 struct cache_tag_t
 search_in_S(struct cache_tag_t *S_head, md_addr_t tag) {
-    struct cache_tag_t iter;
+    struct cache_tag_t *iter;
 
     for(iter = S_head;
         iter != NULL;
