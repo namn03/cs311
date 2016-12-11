@@ -347,8 +347,8 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 		 tick_t now);		/* time of cache flush */
 
 struct cache_tag_t
-search_in_S(struct cache_t S_head, md_addr_t tag);
+search_in_S(struct cache_tag_t *S_head, md_addr_t tag);
 
 void
-prune(struct cache_set_t set);
+prune(struct cache_set_t *set);
 #endif /* CACHE_H */

@@ -637,11 +637,11 @@ cache_access(struct cache_t *cp,	/* cache to access */
 //llllll
   case Custom:
     // miss
-    repl = cp->sets[set]->Q_head->self;
+    repl = cp->sets[set].Q_head->self;
 
     // Check tag in S
-    struct cache_tag_t S_head = cp->sets[set]->S_head;
-    struct cache_tag_t tag_node = search_in_S(S_head, blk->tag);
+    struct cache_tag_t S_head = cp->sets[set].S_head;
+    struct cache_tag_t tag_node = search_in_S(cp->sets[set].S_head, blk->tag);
     // case 1 : addr in S
     if(tag_node) {
       // move it to s_head + change type(LIR = 0)
@@ -654,25 +654,25 @@ cache_access(struct cache_t *cp,	/* cache to access */
       tag_node->prev = NULL;
       tag_node->next = S_head;
       S_head->prev = tag_node;
-      cp->sets[set]->S_head = tag_node;
+      cp->sets[set].S_head = tag_node;
     
       tag_node->type = 0;
 
       // move S_tail(B) to Q_head + change type(HIR resident )
       //   1) if Q_head(E)'s next, prev are both null, free it
       //   2) else, change type
-      struct cache_tag_t Q_head = sets[set]->Q_head;
+      struct cache_tag_t Q_head = sets[set].Q_head;
       if(Q_head->prev && Q_head->next) {
         free(Q_head);
       } else {
         Q_head->type = 2;
       }
 
-      sets[set]->Q_head = sets[set]->S_tail;
-      sets[set]->Q_head->type = 1;
+      sets[set].Q_head = sets[set].S_tail;
+      sets[set].Q_head->type = 1;
 
       // prune
-      prune(cp->sets[set]);
+      prune(&cp->sets[set]);
     } else {
       // case 2 : not in S
       // push top of S + type = HIR resident
@@ -685,20 +685,20 @@ cache_access(struct cache_t *cp,	/* cache to access */
       S_head->prev = tag_node;
       tag_node->next = S_head;
       tag_node->prev = NULL;
-      sets[set]->S_head = tag_node;
+      sets[set].S_head = tag_node;
 
       // move S_tail(B) to Q_head + change type(HIR resident )
       //   1) if Q_head(E)'s next, prev are both null, free it
       //   2) else, change type
-      struct cache_tag_t Q_head = sets[set]->Q_head;
+      struct cache_tag_t Q_head = sets[set].Q_head;
       if(Q_head->prev && Q_head->next) {
         free(Q_head);
       } else {
         Q_head->type = 2;
       }
 
-      sets[set]->Q_head = sets[set]->S_tail;
-      sets[set]->Q_head->type = 1;
+      sets[set].Q_head = sets[set].S_tail;
+      sets[set].Q_head->type = 1;
     }
 
       
@@ -807,27 +807,67 @@ cache_access(struct cache_t *cp,	/* cache to access */
       /* move this block to head of the way (MRU) list */
       update_way_list(&cp->sets[set], blk, Head);
     }
+  // kkkkk
   else if(cp->policy == Custom) {
     // hit
     // move to S_head
     struct cache_tag_t tag_node = blk->self;
+    
+    // HIRS and not in S
+    if(!Q_head->prev && !Q_head->next) {
+      // push
+      cp->sets[set].S_head->prev = tag_node;
+      tag_node->prev = NULL;
+      tag_node->next = cp->sets[set].S_head;
+      cp->sets[set].S_head = tag_node;
+    } else {
+      cp->sets[set].S_head->prev = tag_node;
+      tag_node->next = sets[set].S_head;
+      tag_node->prev = NULL;
+      cp->sets[set].S_head = tag_node;
+      
+      switch(tag_node->type) {
+        case 0:
+          prune(&cp->sets[set]);
+          break;
+        case 1:
+          tag_node->type = 0;
+          
+          sets[set].Q_head = sets[set].S_tail;
+          sets[set].Q_head->type = 1;
+          
+          prune(&cp->sets[set]);
+          break;
+        case 2:
+          assert(1);
+          break;
+      }
+    }
 
-    cp->sets[set]->S_head->prev = tag_node;
-    tag_node->next = sets[set]->S_head;
-    tag_node->prev = NULL;
-    cp->sets[set]->S_head = tag_node;
+    switch(tag_node->type) {
+      // case 1: LIR
+      case 0:
+        
+        prune(&cp->sets[set]);
+        break;
+      // case 2: HIR
+      case 1:
+        
+      // 1) in S
+      // change type to LIR
+        if(tag_node->prev || tag_node->next) {
+                  } else {
+          
+        }
+      // prune
+        tag_node->type = 0;
+      // 2) not in S,
+      // push to S_head
+      case 2:
+        assert(1);
+        break;
+    }
 
-    // case 1: LIR
-    prune(c
-    if(tag_node-
-    // case 2: HIR
-    // 1) in S
-    // change type to LIR
-    // Q->head = S->tail
-    // s->tail->type = HIR
-    // prune
-    // 2) not in S,
-    // push to S_head
   }
 
   /* tag is unchanged, so hash links (if they exist) are still valid */
@@ -1017,7 +1057,7 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 }
 
 struct cache_tag_t
-search_in_S(struct cache_tag_t S_head, md_addr_t tag) {
+search_in_S(struct cache_tag_t *S_head, md_addr_t tag) {
     struct cache_tag_t iter;
 
     for(iter = S_head;
@@ -1033,7 +1073,7 @@ search_in_S(struct cache_tag_t S_head, md_addr_t tag) {
 }
 
 void
-prune(struct cache_set_t set) {
+prune(struct cache_set_t *set) {
   struct cache_tag_t iter;
 
   while(set->S_tail->type > 0) {
