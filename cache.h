@@ -146,7 +146,7 @@ struct cache_blk_t
   struct cache_blk_t *way_next;	/* next block in the ordered way chain, used
 				   to order blocks for replacement */
   struct cache_blk_t *way_prev;	/* previous block in the order way chain */
-
+  struct cache_tag_t *self;
   struct cache_blk_t *hash_next;/* next block in the hash bucket chain, only
 				   used in highly-associative caches */
   /* since hash table lists are typically small, there is no previous
@@ -167,11 +167,11 @@ struct cache_blk_t
 
 struct cache_tag_t
 {
-  md_addr_t tag;
   struct cache_tag_t *next;
   struct cache_tag_t *prev;
+  struct cache_blk_t *self;
   int type;
-  // 0:LIR 1:non-resident HIR 2:regident HIR
+  // 0:LIR 1:resident HIR 2:non-regident HIR
 }
 
 /* cache set definition (one or more blocks sharing the same set index) */
@@ -346,4 +346,9 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 		 md_addr_t addr,	/* address of block to flush */
 		 tick_t now);		/* time of cache flush */
 
+struct cache_tag_t
+search_in_S(struct cache_t S_head, md_addr_t tag);
+
+void
+prune(struct cache_set_t set);
 #endif /* CACHE_H */

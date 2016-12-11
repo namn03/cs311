@@ -628,44 +628,81 @@ cache_access(struct cache_t *cp,	/* cache to access */
     }
 
   /* cache block not found */
-
   /* **MISS** */
   cp->misses++;
 
   /* select the appropriate block to replace, and re-link this entry to
      the appropriate place in the way list */
   switch (cp->policy) {
+//llllll
   case Custom:
-    struct cache_tag_t iter;
     // miss
+    repl = cp->sets[set]->Q_head->self;
+
     // Check tag in S
-    tag = find()
+    struct cache_tag_t S_head = cp->sets[set]->S_head;
+    struct cache_tag_t tag_node = search_in_S(S_head, blk->tag);
     // case 1 : addr in S
-    // move it to s_head + change type(LIR = 0)
-    //   1) if Q_head(E)'s next, prev are both null, free it
-    //   2) else, change type
-    // move S_tail(B) to Q_head + change type(HIR resident )
-    // prune(next, prev NULL!)
-    if(tag) {
+    if(tag_node) {
+      // move it to s_head + change type(LIR = 0)
+      if(tag_node->prev) {
+        tag_node->prev->next = tag_node->next;
+      }
+      assert(tag_node->next);
+      tag_node->next->prev = tag_node->prev;
+   
+      tag_node->prev = NULL;
+      tag_node->next = S_head;
+      S_head->prev = tag_node;
+      cp->sets[set]->S_head = tag_node;
+    
+      tag_node->type = 0;
+
+      // move S_tail(B) to Q_head + change type(HIR resident )
+      //   1) if Q_head(E)'s next, prev are both null, free it
+      //   2) else, change type
+      struct cache_tag_t Q_head = sets[set]->Q_head;
+      if(Q_head->prev && Q_head->next) {
+        free(Q_head);
+      } else {
+        Q_head->type = 2;
+      }
+
+      sets[set]->Q_head = sets[set]->S_tail;
+      sets[set]->Q_head->type = 1;
+
+      // prune
+      prune(cp->sets[set]);
+    } else {
+      // case 2 : not in S
+      // push top of S + type = HIR resident
+      // change type of Q_head(E) to HIR non-resident
+      // Q_head = new(C), type of new = HIR resident
+      tag_node = calloc(1, sizeof(struct cache_tag_t));
+      tag_node->type = 1;
+      tag_node->self = blk;
+
+      S_head->prev = tag_node;
+      tag_node->next = S_head;
+      tag_node->prev = NULL;
+      sets[set]->S_head = tag_node;
+
+      // move S_tail(B) to Q_head + change type(HIR resident )
+      //   1) if Q_head(E)'s next, prev are both null, free it
+      //   2) else, change type
+      struct cache_tag_t Q_head = sets[set]->Q_head;
+      if(Q_head->prev && Q_head->next) {
+        free(Q_head);
+      } else {
+        Q_head->type = 2;
+      }
+
+      sets[set]->Q_head = sets[set]->S_tail;
+      sets[set]->Q_head->type = 1;
     }
 
-    // case 2 : not in S
-    // push top of S + type = HIR resident
-    // change type of Q_head(E) to HIR non-resident
-    // Q_head = new(C), type of new = HIR resident
+      
 
-    // if S_size is too big,
-    // remove cloest HIRS non-resident from tail
-
-    for(iter = cp->sets[set].S_head;
-        iter != NULL;
-	iter = iter->next) {
-	// f
-          if(iter->tag == blk->tag) {
-	    assert(iter->type == 1);
-            iter->
-	  }
-	}
   case LRU:
   case FIFO:
     repl = cp->sets[set].way_tail;
@@ -773,8 +810,16 @@ cache_access(struct cache_t *cp,	/* cache to access */
   else if(cp->policy == Custom) {
     // hit
     // move to S_head
+    struct cache_tag_t tag_node = blk->self;
+
+    cp->sets[set]->S_head->prev = tag_node;
+    tag_node->next = sets[set]->S_head;
+    tag_node->prev = NULL;
+    cp->sets[set]->S_head = tag_node;
+
     // case 1: LIR
-    // prune
+    prune(c
+    if(tag_node-
     // case 2: HIR
     // 1) in S
     // change type to LIR
@@ -969,4 +1014,37 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 
   /* return latency of the operation */
   return lat;
+}
+
+struct cache_tag_t
+search_in_S(struct cache_tag_t S_head, md_addr_t tag) {
+    struct cache_tag_t iter;
+
+    for(iter = S_head;
+        iter != NULL;
+	iter = iter->next) {
+          if(iter->self->tag == tag) {
+	    assert(iter->type == 2);
+            return iter;
+	  }
+	}
+
+    return NULL;
+}
+
+void
+prune(struct cache_set_t set) {
+  struct cache_tag_t iter;
+
+  while(set->S_tail->type > 0) {
+    set->S_tail->prev->next = set->S_tail;
+    set->S_tail= set->S_tail->prev;
+
+    if(set->S_tail->type == 2) {
+      free(set->S_tail);
+    } else {
+      set->S_tail->prev = NULL;
+      set->S_tail->next = NULL;
+    }
+  }
 }
