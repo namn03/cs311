@@ -170,6 +170,7 @@ struct cache_tag_t
   struct cache_tag_t *next;
   struct cache_tag_t *prev;
   struct cache_blk_t *self;
+  md_addr_t tag;
   int type;
   // 0:LIR 1:resident HIR 2:non-regident HIR
 };
@@ -354,5 +355,5 @@ void
 prune(struct cache_set_t *set);
 
 void
-print_S(struct cache_tag_t *head);
+print_SQ(struct cache_tag_t *S_head, struct cache_tag_t *Q_head);
 #endif /* CACHE_H */
